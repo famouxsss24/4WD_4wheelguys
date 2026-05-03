@@ -46,6 +46,7 @@ env/
 *.jpg
 *.jpeg
 *.png
+*.heic
 *.bmp
 *.mp4
 *.avi

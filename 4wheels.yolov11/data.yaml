@@ -1,0 +1,8 @@
+# 맥북 로컬 절대 경로로 수정된 버전
+# data.yaml 내용
+train: /Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/4wheels.yolov11/train/images
+val: /Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/4wheels.yolov11/train/images
+test: /Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/4wheels.yolov11/test/images
+
+nc: 8
+names: ['brr', 'green', 'left', 'limit', 'red', 'right', 'stop', 'straight']
