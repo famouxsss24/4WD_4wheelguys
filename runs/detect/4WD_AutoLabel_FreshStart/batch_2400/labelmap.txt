@@ -1,1 +1,0 @@
-names: ['brr', 'green', 'left', 'limit', 'red', 'right', 'stop', 'straight']

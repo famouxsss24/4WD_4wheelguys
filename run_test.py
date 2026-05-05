@@ -17,7 +17,7 @@ print("🚀 드디어 실전 테스트(Test)를 시작합니다! AI가 낯선 �
 # model.val() 함수에서 split='test'를 주면 최종 평가 모드로 작동합니다.
 metrics = model.val(
     data=yaml_path,
-    split='test',      # ⭐ 핵심: train이나 val이 아닌 'test' 사진만 사용!
+    split='test',      # ⭐ 핵심: train이나 val이 아닌 'test' 사진만 사용
     device='mps',      # 맥북 M3 Pro 가속
     plots=True         # 결과 그래프, 오차 행렬, 정답 비교 사진 자동 저장
 )

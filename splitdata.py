@@ -8,13 +8,13 @@ import random
 source_folders = [
     {
         "name": "📱 Phone",
-        "images": "/Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/4wheels.yolov11/train/images",
-        "labels": "/Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/4wheels.yolov11/train/labels"
+        "images": "/Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/phone.yolov11/train/images",
+        "labels": "/Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/phone.yolov11/train/labels"
     },
     {
         "name": "🍓 Raspberry Pi",
-        "images": "/Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/final.yolov11/train/images",
-        "labels": "/Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/final.yolov11/train/labels"
+        "images": "/Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/raspberry.yolov11/train/images",
+        "labels": "/Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/raspberry.yolov11/train/labels"
     }
 ]
 
