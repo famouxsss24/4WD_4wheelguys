@@ -165,28 +165,35 @@ def main():
 
                     # 교차로 관련 표지판인 경우 (5개 중 하나)
                     if sign_class in intersection_signs:
-                        intersection_sign_count += 1
                         
-                        # 각 표지판에 따른 액션 부여
-                        if sign_class == "left":
-                            current_command = 1
-                        elif sign_class == "right":
-                            current_command = 2
-                        elif sign_class == "straight":
-                            current_command = 3
-                        elif sign_class == "red":
-                            current_command = 2                  
-                            stop_time_end = current_time + 3.0   
-                            cooldown_time = 4.5 # 무한정지 방지
-                        elif sign_class == "green":
-                            current_command = 2                  
-
-                        # 카운트가 3이 되면 탈출 타이머 가동
-                        if intersection_sign_count >= 3:
-                            cmd_reset_time_end = current_time + 3.0  #!!!실제 트랙 상황에 맞게 조절 필요
-                            intersection_sign_count = 0 
+                        # 💡 [핵심 방어 로직] 외곽(C0) 주행 중 'straight'를 보면 완전히 무시!
+                        if current_command == 0 and sign_class == "straight":
+                            cooldown_time = 0 # 💡 추가된 수정: 무시했으므로 쿨다운도 먹이지 않음 (유령 쿨다운 방지)
+                        
                         else:
-                            cmd_reset_time_end = float('inf')
+                            # 위 조건을 통과한 경우에만 카운터 증가
+                            intersection_sign_count += 1
+                            
+                            # 각 표지판에 따른 액션 부여
+                            if sign_class == "left":
+                                current_command = 1
+                            elif sign_class == "right":
+                                current_command = 2
+                            elif sign_class == "straight":
+                                current_command = 3 # (외곽이 아니므로) 정상적으로 C3으로 전환
+                            elif sign_class == "red":
+                                current_command = 1                  
+                                stop_time_end = current_time + 3.0   
+                                cooldown_time = 4.5 # 무한정지 방지
+                            elif sign_class == "green":
+                                current_command = 2                  
+
+                            # 카운트가 3이 되면 탈출 타이머 가동
+                            if intersection_sign_count >= 3:
+                                cmd_reset_time_end = current_time + 3.0  #!!!실제 트랙 상황에 맞게 조절 필요
+                                intersection_sign_count = 0 
+                            else:
+                                cmd_reset_time_end = float('inf')
 
                     # 기타 일반 표지판
                     elif sign_class == "stop":
