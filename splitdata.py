@@ -15,10 +15,15 @@ source_folders = [
         "name": "🍓 Raspberry Pi",
         "images": "/Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/raspberry.yolov11/train/images",
         "labels": "/Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/raspberry.yolov11/train/labels"
+    },
+    {
+        "name": "add_finaldata",
+        "images": "/Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/finaldata/train/images",
+        "labels": "/Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/finaldata/train/labels"
     }
 ]
 
-output_dir = '/Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/Final_Dataset'
+output_dir = '/Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/Final_Datasetv2'
 
 # ==========================================
 # ⚙️ 2. 비율 설정 (Train 80%, Valid 10%, Test 10%)
@@ -96,4 +101,4 @@ for folder in source_folders:
     v_cnt = distribute_files(val_imgs, img_dir, lbl_dir, 'val')
     test_cnt = distribute_files(test_imgs, img_dir, lbl_dir, 'test')
 
-print("\n✅ 모든 기기의 데이터가 비율을 유지한 채 완벽하게 섞였습니다! 'Final_Dataset'을 확인하세요.")
+print("\n✅ 모든 기기의 데이터가 비율을 유지한 채 완벽하게 섞였습니다! 'Final_Datasetv2'을 확인하세요.")

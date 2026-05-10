@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['final']
+
+roboflow:
+  workspace: s-workspace-olf8m
+  project: s-workspace-olf8m
+  version: dataset
+  license: Private
+  url: https://app.roboflow.com/s-workspace-olf8m/s-workspace-olf8m/dataset

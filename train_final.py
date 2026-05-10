@@ -6,7 +6,7 @@ model = YOLO('yolo11n.pt')
 # 2. 학습 시작
 model.train(
     # 📍 경로 설정 (수정 완료된 절대 경로)
-    data='/Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/Final_Dataset/data.yaml',
+    data='/Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/Final_Datasetv2/data.yaml',
     
     # ⚙️ 기본 학습 설정
     epochs=300,         # (수정) 혹독한 증강을 소화하기 위해 에포크를 늘립니다.
