@@ -11,7 +11,7 @@ model.train(
     # ⚙️ 기본 학습 설정
     epochs=300,         # (수정) 혹독한 증강을 소화하기 위해 에포크를 늘립니다.
     patience=20,        # (추가) 20번 연속으로 성적이 안 오르면 알아서 조기 종료합니다.
-    imgsz=[480, 640],          # [480, 640]으로 쓰셔도 되지만, 보통 정사각형(640)이 표준입니다.
+    imgsz= 640,          # 640,320 
     device='mps',       # 맥북 M3 Pro GPU 가속
     batch=32,           # 한 번에 처리할 사진 수 (M3 Pro 메모리에 맞게 16~32 추천)
     workers=8,          # 데이터 로딩 속도 향상
@@ -45,7 +45,7 @@ model.train(
     
     # 📂 저장 위치 설정
     project='4WD_Final_Project',
-    name='train_1045_data'
+    name='train_data_640'
 )
 
 print("✅ 학습이 성공적으로 시작되었습니다!")
