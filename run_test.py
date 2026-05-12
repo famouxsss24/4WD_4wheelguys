@@ -4,7 +4,7 @@ from ultralytics import YOLO
 # 📍 1. 끝판왕 모델 불러오기
 # ==========================================
 # 아까 학습하다가 멈췄을 때 저장된 최고의 성적표(best.pt) 경로입니다.
-best_model_path = '/Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/runs/detect/4WD_Final_Project/train_1045_data-2/weights/best.pt'
+best_model_path = '/Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/runs/detect/4WD_Final_Project/train_data_640/weights/best.pt'
 model = YOLO(best_model_path)
 
 # ==========================================

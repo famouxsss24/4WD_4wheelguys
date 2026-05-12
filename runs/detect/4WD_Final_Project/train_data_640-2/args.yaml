@@ -13,7 +13,7 @@ cache: true
 device: mps
 workers: 8
 project: 4WD_Final_Project
-name: train_data_640
+name: train_data_640-2
 exist_ok: false
 pretrained: true
 optimizer: auto
@@ -107,4 +107,4 @@ auto_augment: randaugment
 erasing: 0.4
 cfg: null
 tracker: botsort.yaml
-save_dir: /Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/runs/detect/4WD_Final_Project/train_data_640
+save_dir: /Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/runs/detect/4WD_Final_Project/train_data_640-2
