@@ -5,4 +5,4 @@ val: /Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelgu
 test: /Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/Final_Datasetv2/images/test
 
 nc: 9
-names: ['brr', 'green', 'left', 'limit', 'red', 'right', 'stop', 'straight', 'final']
+names: ['brr', 'green', 'left', 'limit', 'red', 'right', 'stop', 'straight','final']
