@@ -1,7 +1,7 @@
 task: detect
 mode: train
 model: yolo11n.pt
-data: /Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/Final_Datasetv2/data.yaml
+data: /Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/Final_Datasetv3/data.yaml
 epochs: 300
 time: null
 patience: 20
@@ -91,9 +91,9 @@ hsv_h: 0.015
 hsv_s: 0.7
 hsv_v: 0.4
 degrees: 10.0
-translate: 0.1
+translate: 0.05
 scale: 0.8
-shear: 2.0
+shear: 1.0
 perspective: 0.001
 flipud: 0.0
 fliplr: 0.0
