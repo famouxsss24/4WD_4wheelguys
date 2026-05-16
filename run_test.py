@@ -4,13 +4,13 @@ from ultralytics import YOLO
 # 📍 1. 끝판왕 모델 불러오기
 # ==========================================
 # (best.pt) 경로입니다.
-best_model_path = '/Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/runs/detect/4WD_Final_Project/train_data_640-2/weights/best.pt'
+best_model_path = '/Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/runs/detect/4WD_Final_Project/train_data_0516/weights/best.pt'
 model = YOLO(best_model_path)
 
 # ==========================================
 # 📝 2. 실전 테스트(수능) 설정 및 실행
 # ==========================================
-yaml_path = '/Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/Final_Datasetv2/data.yaml'
+yaml_path = '/Users/gwonchangbin/univ/2-1/임베디드인공지능최적화/4WD_4wheelguys/Final_Datasetv4/data.yaml'
 
 print("🚀 드디어 실전 테스트(Test)를 시작합니다! AI가 낯선 사진들을 분석합니다...")
 
