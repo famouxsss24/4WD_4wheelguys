@@ -17,7 +17,7 @@ PWMB = PWMOutputDevice(23)
 BIN1 = DigitalOutputDevice(25)  
 BIN2 = DigitalOutputDevice(24)
 
-BUZZER = Buzzer(17) 
+BUZZER = Buzzer(12) 
 
 def set_motors(left_speed, right_speed, left_dir="forward", right_dir="forward"):
     AIN1.value, AIN2.value = (0, 1) if left_dir == "forward" else (1, 0)
@@ -31,11 +31,16 @@ def stop():
     BUZZER.off()
 
 def sign_detection_process(frame_queue, shared_data, running_event):
-    model_path = "code/model/best_0505.onnx" 
+    model_path = "model/best_640_int8.tflite" 
     try:
-        model = YOLO(model_path)
+        interpreter = tflite.Interpreter(model_path=model_path)
+        interpreter.allocate_tensors()
+        input_details = interpreter.get_input_details()
+        output_details = interpreter.get_output_details()
+        
+        class_names = ['brr', 'green', 'left', 'limit', 'red', 'right', 'stop', 'straight','final']
     except Exception as e:
-        shared_data['latest_sign_text'] = "모델 로드 실패"
+        shared_data['latest_sign_text'] = f"모델 로드 실패: {e}"
         return
 
     k_frames = 5
@@ -46,26 +51,40 @@ def sign_detection_process(frame_queue, shared_data, running_event):
         if not frame_queue.empty():
             frame_to_process = frame_queue.get()
             
-            results = model(frame_to_process, verbose=False)
+            img_rgb = cv2.cvtColor(frame_to_process, cv2.COLOR_BGR2RGB)
+            input_h, input_w = input_details[0]['shape'][1], input_details[0]['shape'][2]
+            img_resized = cv2.resize(img_rgb, (input_w, input_h))
+            img_input = np.expand_dims(img_resized.astype(np.float32) / 255.0, axis=0)
+            
+            interpreter.set_tensor(input_details[0]['index'], img_input)
+            interpreter.invoke()
+            
+            output_data = interpreter.get_tensor(output_details[0]['index'])
+            output_data = np.squeeze(output_data) 
+            
+            boxes = output_data[:4, :].T
+            scores_matrix = output_data[4:, :].T
+            
+            scores = np.max(scores_matrix, axis=1)
+            class_ids = np.argmax(scores_matrix, axis=1)
             
             best_class_name = "없음"
             max_area = 0
             best_confidence = 0.0
             
-            for box in results[0].boxes:
-                confidence = float(box.conf[0])
+            mask = scores >= 0.7
+            filtered_boxes = boxes[mask]
+            filtered_scores = scores[mask]
+            filtered_class_ids = class_ids[mask]
+            
+            for i in range(len(filtered_scores)):
+                w, h = filtered_boxes[i][2], filtered_boxes[i][3]
+                area = w * h
                 
-                if confidence >= 0.7: 
-                    class_id = int(box.cls[0])
-                    class_name = model.names[class_id]
-                    
-                    x1, y1, x2, y2 = box.xyxy[0].tolist()
-                    area = (x2 - x1) * (y2 - y1)
-                    
-                    if area > max_area:
-                        max_area = area
-                        best_class_name = class_name
-                        best_confidence = confidence
+                if area > max_area:
+                    max_area = area
+                    best_class_name = class_names[filtered_class_ids[i]]
+                    best_confidence = filtered_scores[i]
 
             history.append(best_class_name)
 
@@ -85,7 +104,7 @@ def main():
     running_event = multiprocessing.Event()
     running_event.set()
 
-    lane_model_path = "code/model/my_rc_car_cil_model_normal.tflite"
+    lane_model_path = "model/model_fp32_0516.tflite"
     interpreter = tflite.Interpreter(model_path=lane_model_path)
     interpreter.allocate_tensors()
     input_details = interpreter.get_input_details()
@@ -215,7 +234,7 @@ def main():
             input_data = np.expand_dims(input_data, axis=0)
 
             input_cmd_data = np.zeros((1, 4), dtype=np.float32)
-            input_cmd_data[0, current_command] = 1.0
+            input_cmd_data[0, current_command] = 2
 
             interpreter.set_tensor(img_idx, input_data)
             interpreter.set_tensor(cmd_idx, input_cmd_data)
