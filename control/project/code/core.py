@@ -31,9 +31,19 @@ def stop():
     BUZZER.off()
 
 def sign_detection_process(frame_queue, shared_data, running_event):
+    import os
+    try:
+        cpu_count = os.cpu_count() or 4
+        if cpu_count >= 4:
+            os.sched_setaffinity(0, {2, 3})
+        elif cpu_count >= 2:
+            os.sched_setaffinity(0, {1})
+    except Exception:
+        pass
+
     model_path = "model/best_640_int8.tflite" 
     try:
-        interpreter = tflite.Interpreter(model_path=model_path)
+        interpreter = tflite.Interpreter(model_path=model_path, num_threads=2)
         interpreter.allocate_tensors()
         input_details = interpreter.get_input_details()
         output_details = interpreter.get_output_details()
@@ -72,7 +82,7 @@ def sign_detection_process(frame_queue, shared_data, running_event):
             max_area = 0
             best_confidence = 0.0
             
-            mask = scores >= 0.7
+            mask = scores >= 0.5
             filtered_boxes = boxes[mask]
             filtered_scores = scores[mask]
             filtered_class_ids = class_ids[mask]
@@ -104,8 +114,18 @@ def main():
     running_event = multiprocessing.Event()
     running_event.set()
 
+    import os
+    try:
+        cpu_count = os.cpu_count() or 4
+        if cpu_count >= 4:
+            os.sched_setaffinity(0, {0, 1})
+        elif cpu_count >= 2:
+            os.sched_setaffinity(0, {0})
+    except Exception:
+        pass
+
     lane_model_path = "model/model_quant_0516.tflite"
-    interpreter = tflite.Interpreter(model_path=lane_model_path)
+    interpreter = tflite.Interpreter(model_path=lane_model_path, num_threads=2)
     interpreter.allocate_tensors()
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
@@ -195,7 +215,7 @@ def main():
                                 cooldown_time = 4.0
                                 cmd_reset_time_end = float('inf')
                             elif intersection_sign_count == 2:
-                                cooldown_time = 5.0
+                                cooldown_time = 7.0  # 2번째 감지 후 3번째 감지 전까지 쿨다운 7초로 연장 (기존 5.0)
                                 cmd_reset_time_end = float('inf')
                             elif intersection_sign_count >= 3:
                                 cooldown_time = 4.0
@@ -255,7 +275,7 @@ def main():
             input_data = np.expand_dims(input_data, axis=0)
 
             input_cmd_data = np.zeros((1, 4), dtype=np.float32)
-            input_cmd_data[0, current_command] = 1.5
+            input_cmd_data[0, current_command] = 2
 
             interpreter.set_tensor(img_idx, input_data)
             interpreter.set_tensor(cmd_idx, input_cmd_data)
