@@ -104,7 +104,7 @@ def main():
     running_event = multiprocessing.Event()
     running_event.set()
 
-    lane_model_path = "model/model_fp32_0516.tflite"
+    lane_model_path = "model/model_quant_0516.tflite"
     interpreter = tflite.Interpreter(model_path=lane_model_path)
     interpreter.allocate_tensors()
     input_details = interpreter.get_input_details()
@@ -130,6 +130,11 @@ def main():
     cmd_reset_time_end = float('inf')
     intersection_sign_count = 0
     intersection_signs = ["left", "right", "straight", "red", "green"]
+    
+    # 일회성 표지판 플래그 초기화
+    has_stop_triggered = False
+    has_limit_triggered = False
+    has_brr_triggered = False
     
     is_finished = False
     smoothed_prediction = 0.0  
@@ -158,9 +163,15 @@ def main():
             latest_sign_text = shared_data['latest_sign_text']
             sign_class = latest_sign_text.split(" ")[0] 
 
+            # 이미 한 번 실행된 일회성 표지판은 무시
+            if (sign_class == "stop" and has_stop_triggered) or \
+               (sign_class == "limit" and has_limit_triggered) or \
+               (sign_class == "brr" and has_brr_triggered):
+                sign_class = "없음"
+
             if sign_class != "없음":
                 if current_time > sign_cooldown_end:
-                    cooldown_time = 2.5 
+                    cooldown_time = 4.0 
 
                     if sign_class in intersection_signs:
                         if current_command == 0 and sign_class == "straight":
@@ -176,30 +187,38 @@ def main():
                             elif sign_class == "red":
                                 current_command = 1                  
                                 stop_time_end = current_time + 3.0   
-                                cooldown_time = 4.5
                             elif sign_class == "green":
                                 current_command = 2                  
 
-                            if intersection_sign_count >= 3:
-                                cmd_reset_time_end = current_time + 3.0
-                                intersection_sign_count = 0 
-                            else:
+                            # 카운트별 차등 쿨다운 및 자동 복귀 예약 설정
+                            if intersection_sign_count == 1:
+                                cooldown_time = 4.0
                                 cmd_reset_time_end = float('inf')
+                            elif intersection_sign_count == 2:
+                                cooldown_time = 5.0
+                                cmd_reset_time_end = float('inf')
+                            elif intersection_sign_count >= 3:
+                                cooldown_time = 4.0
+                                cmd_reset_time_end = current_time + 4.0
 
                     elif sign_class == "stop":
                         stop_time_end = current_time + 3.5 
                         cooldown_time = 5.0
+                        has_stop_triggered = True
                     elif sign_class == "limit":
                         limit_time_end = current_time + 4.0 
+                        has_limit_triggered = True
                     elif sign_class == "brr":
                         buzzer_time_end = current_time + 1.0 
-                    elif sign_class == "finish": 
+                        has_brr_triggered = True
+                    elif sign_class in ["finish", "final"]: 
                         is_finished = True
 
                     sign_cooldown_end = current_time + cooldown_time
 
             if current_command in [1, 2, 3] and current_time > cmd_reset_time_end:
                 current_command = 0  
+                intersection_sign_count = 0
                 cmd_reset_time_end = float('inf') 
                 
             if is_finished:
@@ -208,16 +227,18 @@ def main():
 
             if current_time < stop_time_end:
                 set_motors(0, 0)
-                sys.stdout.write(f"\r[🛑 대기 중] 표지판: {latest_sign_text:<15} 카운트: {intersection_sign_count}/3   ")
-                sys.stdout.flush()
+                if (current_time - last_print_time) > 0.3:
+                    sys.stdout.write(f"\r[대기] 표지판:{latest_sign_text} | 카운트:{intersection_sign_count}/3 | 남은시간:{stop_time_end - current_time:.1f}s\033[K")
+                    sys.stdout.flush()
+                    last_print_time = current_time
                 continue
 
             if current_time < limit_time_end:
                 speedSet = 0.3
-                speed_str = "⚠️ 서행(0.3)"
+                speed_str = "서행(0.3)"
             else:
                 speedSet = 0.5
-                speed_str = "▶️ 정상(0.5)"
+                speed_str = "정상(0.5)"
 
             if current_time < buzzer_time_end:
                 BUZZER.on()
@@ -234,7 +255,7 @@ def main():
             input_data = np.expand_dims(input_data, axis=0)
 
             input_cmd_data = np.zeros((1, 4), dtype=np.float32)
-            input_cmd_data[0, current_command] = 2
+            input_cmd_data[0, current_command] = 1.5
 
             interpreter.set_tensor(img_idx, input_data)
             interpreter.set_tensor(cmd_idx, input_cmd_data)
@@ -254,17 +275,18 @@ def main():
             
             if P == 0.0:
                 left_pwm, right_pwm = speedSet, speedSet
-                dir_str = "⬆️ 직진"
+                dir_str = "직진"
             elif P > 0:
                 left_pwm, right_pwm = speedSet, speedSet * (1.0 - P)
-                dir_str = "➡️ 우조향"
+                dir_str = "우조향"
             else:
                 left_pwm, right_pwm = speedSet * (1.0 + P), speedSet
-                dir_str = "⬅️ 좌조향"
+                dir_str = "좌조향"
 
             if (current_time - last_print_time) > 0.3:
                 cmd_str = ["외곽", "좌회전", "우회전", "교차로직진"][current_command]
-                sys.stdout.write(f"\r[{speed_str}] CIL:{cmd_str:<5} | 조향:{dir_str:<5} | 표지판:{latest_sign_text:<15}   ")
+                reset_str = f"리셋예약({cmd_reset_time_end - current_time:.1f}s)" if cmd_reset_time_end != float('inf') else "일반차선"
+                sys.stdout.write(f"\r[{speed_str}] CIL:{cmd_str} | 조향:{dir_str} | 표지판:{latest_sign_text} | 카운트:{intersection_sign_count}/3 | {reset_str}\033[K")
                 sys.stdout.flush()
                 last_print_time = current_time
 
