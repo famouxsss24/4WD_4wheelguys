@@ -151,10 +151,11 @@ def main():
     intersection_sign_count = 0
     intersection_signs = ["left", "right", "straight", "red", "green"]
     
-    # 일회성 표지판 플래그 초기화
     has_stop_triggered = False
     has_limit_triggered = False
     has_brr_triggered = False
+    has_final_triggered = False
+    final_time_end = float('inf')
     
     is_finished = False
     smoothed_prediction = 0.0  
@@ -183,10 +184,10 @@ def main():
             latest_sign_text = shared_data['latest_sign_text']
             sign_class = latest_sign_text.split(" ")[0] 
 
-            # 이미 한 번 실행된 일회성 표지판은 무시
             if (sign_class == "stop" and has_stop_triggered) or \
                (sign_class == "limit" and has_limit_triggered) or \
-               (sign_class == "brr" and has_brr_triggered):
+               (sign_class == "brr" and has_brr_triggered) or \
+               (sign_class in ["finish", "final"] and has_final_triggered):
                 sign_class = "없음"
 
             if sign_class != "없음":
@@ -210,12 +211,11 @@ def main():
                             elif sign_class == "green":
                                 current_command = 2                  
 
-                            # 카운트별 차등 쿨다운 및 자동 복귀 예약 설정
                             if intersection_sign_count == 1:
                                 cooldown_time = 4.0
                                 cmd_reset_time_end = float('inf')
                             elif intersection_sign_count == 2:
-                                cooldown_time = 7.0  # 2번째 감지 후 3번째 감지 전까지 쿨다운 7초로 연장 (기존 5.0)
+                                cooldown_time = 7.0
                                 cmd_reset_time_end = float('inf')
                             elif intersection_sign_count >= 3:
                                 cooldown_time = 4.0
@@ -232,7 +232,9 @@ def main():
                         buzzer_time_end = current_time + 1.0 
                         has_brr_triggered = True
                     elif sign_class in ["finish", "final"]: 
-                        is_finished = True
+                        final_time_end = current_time + 4.0
+                        has_final_triggered = True
+                        cooldown_time = 5.0
 
                     sign_cooldown_end = current_time + cooldown_time
 
@@ -241,6 +243,9 @@ def main():
                 intersection_sign_count = 0
                 cmd_reset_time_end = float('inf') 
                 
+            if current_time > final_time_end:
+                is_finished = True
+
             if is_finished:
                 print("\n\n🏁 종료라인 인식 주행을 마칩니다.")
                 break
