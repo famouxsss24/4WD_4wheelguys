@@ -44,7 +44,7 @@ def sign_detection_process(frame_queue, shared_data, running_event):
     except Exception:
         pass
 
-    model_path = "model/best_640_int8.tflite" 
+    model_path = "model/best_320_int8.tflite" 
     try:
         interpreter = tflite.Interpreter(model_path=model_path, num_threads=2)
         interpreter.allocate_tensors()
@@ -58,7 +58,7 @@ def sign_detection_process(frame_queue, shared_data, running_event):
 
     k_frames = 5
     n_threshold = 3
-    history = collections.deque(maxlen=k_frames)
+    histories = {cls: collections.deque(maxlen=k_frames) for cls in class_names}
 
     while running_event.is_set():
         if not frame_queue.empty():
@@ -66,7 +66,12 @@ def sign_detection_process(frame_queue, shared_data, running_event):
             
             img_rgb = cv2.cvtColor(frame_to_process, cv2.COLOR_BGR2RGB)
             input_h, input_w = input_details[0]['shape'][1], input_details[0]['shape'][2]
-            img_resized = cv2.resize(img_rgb, (input_w, input_h))
+            
+            if img_rgb.shape[1] == input_w and img_rgb.shape[0] == input_h:
+                img_resized = img_rgb
+            else:
+                img_resized = cv2.resize(img_rgb, (input_w, input_h))
+                
             img_input = np.expand_dims(img_resized.astype(np.float32) / 255.0, axis=0)
             
             interpreter.set_tensor(input_details[0]['index'], img_input)
@@ -83,9 +88,7 @@ def sign_detection_process(frame_queue, shared_data, running_event):
             scores = np.max(scores_matrix, axis=1)
             class_ids = np.argmax(scores_matrix, axis=1)
             
-            best_class_name = "없음"
-            max_area = 0
-            best_confidence = 0.0
+            current_frame_detections = {}
             
             mask = scores >= 0.5
             filtered_boxes = boxes[mask]
@@ -95,16 +98,30 @@ def sign_detection_process(frame_queue, shared_data, running_event):
             for i in range(len(filtered_scores)):
                 w, h = filtered_boxes[i][2], filtered_boxes[i][3]
                 area = w * h
+                cls_name = class_names[filtered_class_ids[i]]
+                conf = filtered_scores[i]
                 
-                if area > max_area:
-                    max_area = area
-                    best_class_name = class_names[filtered_class_ids[i]]
-                    best_confidence = filtered_scores[i]
-
-            history.append(best_class_name)
-
-            if best_class_name != "없음" and history.count(best_class_name) >= n_threshold:
-                shared_data['latest_sign_text'] = f"{best_class_name} ({best_confidence*100:.1f}%)"
+                if cls_name not in current_frame_detections or area > current_frame_detections[cls_name]['area']:
+                    current_frame_detections[cls_name] = {'area': area, 'conf': conf}
+            
+            for cls in class_names:
+                if cls in current_frame_detections:
+                    histories[cls].append((current_frame_detections[cls]['area'], current_frame_detections[cls]['conf']))
+                else:
+                    histories[cls].append(None)
+            
+            valid_candidates = []
+            for cls in class_names:
+                valid_samples = [x for x in histories[cls] if x is not None]
+                if len(valid_samples) >= n_threshold:
+                    latest_area, latest_conf = valid_samples[-1]
+                    if latest_area >= 0.03:
+                        valid_candidates.append((cls, latest_area, latest_conf))
+            
+            if len(valid_candidates) > 0:
+                valid_candidates.sort(key=lambda x: x[1], reverse=True)
+                best_cls, best_area, best_conf = valid_candidates[0]
+                shared_data['latest_sign_text'] = f"{best_cls} ({best_conf*100:.1f}%)"
             else:
                 shared_data['latest_sign_text'] = "없음"
         else:
@@ -130,7 +147,7 @@ def main():
     except Exception:
         pass
 
-    lane_model_path = "model/model_quant_0516.tflite"
+    lane_model_path = "model/model_quant_0523.tflite"
     interpreter = tflite.Interpreter(model_path=lane_model_path, num_threads=2)
     interpreter.allocate_tensors()
     input_details = interpreter.get_input_details()
@@ -143,7 +160,7 @@ def main():
         elif len(detail['shape']) == 2:
             cmd_idx = detail['index']
 
-    camera = mycamera.MyPiCamera(640, 480)
+    camera = mycamera.MyPiCamera(320, 240)
     
     p = multiprocessing.Process(target=sign_detection_process, args=(frame_queue, shared_data, running_event))
     p.start()
@@ -165,12 +182,17 @@ def main():
     recovery_time_end = 0.0
     zone_transition_time = 0.0
     
+    # FSM 데바운스 및 강제 쿨타임 파라미터
+    DEBOUNCE_TIME = 1.2
+    FALLING_RISING_COOLDOWN = 3
+    FALLING_DEBOUNCE_TIME = 0.5
+    last_falling_edge_time = 0.0
+    last_seen_time = 0.0
+    
     has_stop_triggered = False
     has_limit_triggered = False
     has_brr_triggered = False
     has_final_triggered = False
-    has_red_triggered = False
-    has_green_triggered = False
     final_time_end = float('inf')
     last_inference_time = time.time()
     inference_ms = 0.0
@@ -206,101 +228,100 @@ def main():
             if (sign_class == "stop" and has_stop_triggered) or \
                (sign_class == "limit" and has_limit_triggered) or \
                (sign_class == "brr" and has_brr_triggered) or \
-               (sign_class in ["finish", "final"] and has_final_triggered) or \
-               (sign_class == "red" and has_red_triggered) or \
-               (sign_class == "green" and has_green_triggered):
+               (sign_class in ["finish", "final"] and has_final_triggered):
                 sign_class = "없음"
+
+            if sign_class != "없음":
+                last_seen_time = current_time
 
             # 다수결 필터(On/Off 사각파) 특성 기반 Falling Edge 감지
             if sign_class == "없음":
                 if sign_locked:
-                    # 최소 구역 유지 시간(Debounce Time: 1.2초) 검사
-                    if current_time - zone_transition_time > 1.2:
+                    # 최소 구역 유지 시간(Debounce Time) 및 꺼짐 디바운스(Falling Debounce) 검사
+                    if (current_time - last_seen_time > FALLING_DEBOUNCE_TIME) and \
+                       (current_time - zone_transition_time > DEBOUNCE_TIME):
                         sign_locked = False
+                        last_falling_edge_time = current_time  # Falling Edge 발생 시점 기록
                         if current_zone == ZONE_EXIT:
                             # 3단계 (ZONE_EXIT)에서 표지판이 사라진 순간(Falling Edge) 복귀 단계 진입
                             current_zone = ZONE_RECOVERY
-                            recovery_time_end = current_time + 3.0
+                            recovery_time_end = current_time + 5.0
                             zone_transition_time = current_time
                             print(f"\n[FSM] ZONE_EXIT -> ZONE_RECOVERY: 표지판 사라짐 감지 (3초 뒤 외곽 복귀 예약)")
 
             if sign_class != "없음":
                 if not sign_locked:
-                    sign_locked = True  # Rising Edge 진입으로 인한 잠금(Lock) 활성화
-                    zone_transition_time = current_time  # 데바운스 기준 시간 갱신
+                    # Falling -> Rising 강제 쿨타임 검사
+                    if current_time - last_falling_edge_time > FALLING_RISING_COOLDOWN:
+                        sign_locked = True  # Rising Edge 진입으로 인한 잠금(Lock) 활성화
+                        zone_transition_time = current_time  # 데바운스 기준 시간 갱신
                     
-                    if sign_class in intersection_signs:
-                        if current_zone == ZONE_OUTER:
-                            # 1단계 (ZONE_OUTER): 교차로 진입 대기 및 지령 설정
-                            if sign_class == "left":
-                                current_command = 1
-                            elif sign_class == "right":
-                                current_command = 2
-                            elif sign_class == "straight":
-                                current_command = 3
-                            elif sign_class == "red":
-                                current_command = 2                  
-                                stop_time_end = current_time + 3.0   
-                                has_red_triggered = True
-                            elif sign_class == "green":
-                                current_command = 2
-                                has_green_triggered = True
-                            
-                            current_zone = ZONE_INNER
-                            print(f"\n[FSM] ZONE_OUTER -> ZONE_INNER: {sign_class} 감지 (cmd: {current_command})")
+                        if sign_class in intersection_signs:
+                            if current_zone == ZONE_OUTER:
+                                # 1단계 (ZONE_OUTER): 교차로 진입 대기 및 지령 설정
+                                if sign_class == "left":
+                                    current_command = 1
+                                elif sign_class == "right":
+                                    current_command = 2
+                                elif sign_class == "straight":
+                                    current_command = 3
+                                elif sign_class == "red":
+                                    current_command = 1                  
+                                    stop_time_end = current_time + 3.0   
+                                elif sign_class == "green":
+                                    current_command = 2
+                                
+                                current_zone = ZONE_INNER
+                                print(f"\n[FSM] ZONE_OUTER -> ZONE_INNER: {sign_class} 감지 (cmd: {current_command})")
 
-                        elif current_zone == ZONE_INNER:
-                            # 2단계 (ZONE_INNER): 교차로 내부 주행 중 내부 액션 지령 수신
-                            if sign_class == "left":
-                                current_command = 1
-                            elif sign_class == "right":
-                                current_command = 2
-                            elif sign_class == "straight":
-                                current_command = 3
-                            elif sign_class == "red":
-                                current_command = 2                  
-                                stop_time_end = current_time + 3.0   
-                                has_red_triggered = True
-                            elif sign_class == "green":
-                                current_command = 2
-                                has_green_triggered = True
-                            
-                            current_zone = ZONE_EXIT
-                            print(f"\n[FSM] ZONE_INNER -> ZONE_EXIT: {sign_class} 감지 (cmd: {current_command})")
+                            elif current_zone == ZONE_INNER:
+                                # 2단계 (ZONE_INNER): 교차로 내부 주행 중 내부 액션 지령 수신
+                                if sign_class == "left":
+                                    current_command = 1
+                                elif sign_class == "right":
+                                    current_command = 2
+                                elif sign_class == "straight":
+                                    current_command = 3
+                                elif sign_class == "red":
+                                    current_command = 1                  
+                                    stop_time_end = current_time + 3.0   
+                                elif sign_class == "green":
+                                    current_command = 2
+                                
+                                current_zone = ZONE_EXIT
+                                print(f"\n[FSM] ZONE_INNER -> ZONE_EXIT: {sign_class} 감지 (cmd: {current_command})")
 
-                        elif current_zone == ZONE_EXIT:
-                            # 3단계 (ZONE_EXIT): 탈출 명령 표지판이 들어왔을 때 최종 탈출 명령 주입 (Rising Edge)
-                            if sign_class == "left":
-                                current_command = 1
-                            elif sign_class == "right":
-                                current_command = 2
-                            elif sign_class == "straight":
-                                current_command = 3
-                            elif sign_class == "red":
-                                current_command = 2                  
-                                stop_time_end = current_time + 3.0   
-                                has_red_triggered = True
-                            elif sign_class == "green":
-                                current_command = 2
-                                has_green_triggered = True
-                            print(f"\n[FSM] ZONE_EXIT: {sign_class} 감지 (탈출 cmd: {current_command} 적용)")
+                            elif current_zone == ZONE_EXIT:
+                                # 3단계 (ZONE_EXIT): 탈출 명령 표지판이 들어왔을 때 최종 탈출 명령 주입 (Rising Edge)
+                                if sign_class == "left":
+                                    current_command = 1
+                                elif sign_class == "right":
+                                    current_command = 2
+                                elif sign_class == "straight":
+                                    current_command = 3
+                                elif sign_class == "red":
+                                    current_command = 2                  
+                                    stop_time_end = current_time + 3.0   
+                                elif sign_class == "green":
+                                    current_command = 2
+                                print(f"\n[FSM] ZONE_EXIT: {sign_class} 감지 (탈출 cmd: {current_command} 적용)")
 
-                    elif sign_class == "stop":
-                        stop_time_end = current_time + 3.5 
-                        has_stop_triggered = True
-                        print(f"\n[SIGN] stop 감지 (3.5초 대기)")
-                    elif sign_class == "limit":
-                        limit_time_end = current_time + 4.0 
-                        has_limit_triggered = True
-                        print(f"\n[SIGN] limit 감지 (4초 서행)")
-                    elif sign_class == "brr":
-                        buzzer_time_end = current_time + 1.0 
-                        has_brr_triggered = True
-                        print(f"\n[SIGN] brr 감지 (1초 버저)")
-                    elif sign_class in ["finish", "final"]: 
-                        final_time_end = current_time + 4.0
-                        has_final_triggered = True
-                        print(f"\n[SIGN] finish/final 감지 (4초 뒤 종료)")
+                        elif sign_class == "stop":
+                            stop_time_end = current_time + 3.5 
+                            has_stop_triggered = True
+                            print(f"\n[SIGN] stop 감지 (3.5초 대기)")
+                        elif sign_class == "limit":
+                            limit_time_end = current_time + 4.0 
+                            has_limit_triggered = True
+                            print(f"\n[SIGN] limit 감지 (4초 서행)")
+                        elif sign_class == "brr":
+                            buzzer_time_end = current_time + 1.0 
+                            has_brr_triggered = True
+                            print(f"\n[SIGN] brr 감지 (1초 버저)")
+                        elif sign_class in ["finish", "final"]: 
+                            final_time_end = current_time + 4.0
+                            has_final_triggered = True
+                            print(f"\n[SIGN] finish/final 감지 (4초 뒤 종료)")
 
             # 복귀 단계 (ZONE_RECOVERY) 처리: 타이머 만료 시 외곽으로 복귀
             if current_zone == ZONE_RECOVERY:
@@ -309,10 +330,7 @@ def main():
                     current_zone = ZONE_OUTER
                     print(f"\n[FSM] ZONE_RECOVERY -> ZONE_OUTER: 외곽 차선 복귀 완료 (cmd: 0)")
 
-            if current_command in [1, 2, 3] and current_time > cmd_reset_time_end:
-                current_command = 0  
-                cmd_reset_time_end = float('inf') 
-                
+
             if current_time > final_time_end:
                 is_finished = True
 
@@ -334,7 +352,7 @@ def main():
                 speed_str = "서행(0.3)"
             else:
                 speedSet = 0.5
-                speed_str = "정상(0.5)"
+                speed_str = "정상(0.4)"
 
             if current_time < buzzer_time_end:
                 BUZZER.on()
@@ -344,14 +362,13 @@ def main():
             image_rgb = frame[:, :, ::-1]
             height = image_rgb.shape[0]
             roi_image = image_rgb[int(height * 0.60):, :, :]
-            roi_resized = cv2.resize(roi_image, (320, 96))
-            roi_yuv = cv2.cvtColor(roi_resized, cv2.COLOR_RGB2YUV)
+            roi_yuv = cv2.cvtColor(roi_image, cv2.COLOR_RGB2YUV)
             
             input_data = np.float32(roi_yuv) / 255.0
             input_data = np.expand_dims(input_data, axis=0)
 
             input_cmd_data = np.zeros((1, 4), dtype=np.float32)
-            input_cmd_data[0, current_command] = 2
+            input_cmd_data[0, current_command] = 1.0
 
             interpreter.set_tensor(img_idx, input_data)
             interpreter.set_tensor(cmd_idx, input_cmd_data)
@@ -377,7 +394,7 @@ def main():
                 P = 0.0
             else:
                 if current_command in [1, 2]:
-                    P = np.clip(raw_P, -1.8, 1.8)
+                    P = np.clip(raw_P, -2.0, 2.0)
                 else:
                     P = np.clip(raw_P, -1.0, 1.0)
             
