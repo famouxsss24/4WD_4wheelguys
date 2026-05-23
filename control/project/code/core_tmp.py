@@ -179,14 +179,6 @@ def main():
             frame = frame[::-1, ::-1, :]
             current_time = time.time()
 
-            if current_time - last_inference_time > 0.15:
-                stop()
-                if (current_time - last_print_time) > 0.3:
-                    sys.stdout.write(f"\r[🚨 렉 감지] 추론 지연 {current_time - last_inference_time:.3f}s - 긴급 정지\033[K")
-                    sys.stdout.flush()
-                    last_print_time = current_time
-                time.sleep(0.01)
-                continue
 
             if frame_queue.full():
                 try:
