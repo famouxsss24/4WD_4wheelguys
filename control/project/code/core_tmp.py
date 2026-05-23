@@ -163,6 +163,7 @@ def main():
     current_zone = ZONE_OUTER
     sign_locked = False
     recovery_time_end = 0.0
+    zone_transition_time = 0.0
     
     has_stop_triggered = False
     has_limit_triggered = False
@@ -209,16 +210,20 @@ def main():
             # 다수결 필터(On/Off 사각파) 특성 기반 Falling Edge 감지
             if sign_class == "없음":
                 if sign_locked:
-                    sign_locked = False
-                    if current_zone == ZONE_EXIT:
-                        # 3단계 (ZONE_EXIT)에서 표지판이 사라진 순간(Falling Edge) 복귀 단계 진입
-                        current_zone = ZONE_RECOVERY
-                        recovery_time_end = current_time + 3.0
-                        print(f"\n[FSM] ZONE_EXIT -> ZONE_RECOVERY: 표지판 사라짐 감지 (3초 뒤 외곽 복귀 예약)")
+                    # 최소 구역 유지 시간(Debounce Time: 1.2초) 검사
+                    if current_time - zone_transition_time > 1.2:
+                        sign_locked = False
+                        if current_zone == ZONE_EXIT:
+                            # 3단계 (ZONE_EXIT)에서 표지판이 사라진 순간(Falling Edge) 복귀 단계 진입
+                            current_zone = ZONE_RECOVERY
+                            recovery_time_end = current_time + 3.0
+                            zone_transition_time = current_time
+                            print(f"\n[FSM] ZONE_EXIT -> ZONE_RECOVERY: 표지판 사라짐 감지 (3초 뒤 외곽 복귀 예약)")
 
             if sign_class != "없음":
                 if not sign_locked:
                     sign_locked = True  # Rising Edge 진입으로 인한 잠금(Lock) 활성화
+                    zone_transition_time = current_time  # 데바운스 기준 시간 갱신
                     
                     if sign_class in intersection_signs:
                         if current_zone == ZONE_OUTER:
