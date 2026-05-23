@@ -70,7 +70,9 @@ def sign_detection_process(frame_queue, shared_data, running_event):
             img_input = np.expand_dims(img_resized.astype(np.float32) / 255.0, axis=0)
             
             interpreter.set_tensor(input_details[0]['index'], img_input)
+            t_yolo0 = time.time()
             interpreter.invoke()
+            shared_data['yolo_latency_ms'] = (time.time() - t_yolo0) * 1000
             
             output_data = interpreter.get_tensor(output_details[0]['index'])
             output_data = np.squeeze(output_data) 
@@ -112,6 +114,7 @@ def main():
     manager = multiprocessing.Manager()
     shared_data = manager.dict()
     shared_data['latest_sign_text'] = "없음"
+    shared_data['yolo_latency_ms'] = 0.0
     
     frame_queue = multiprocessing.Queue(maxsize=1)
     running_event = multiprocessing.Event()
@@ -151,8 +154,15 @@ def main():
     buzzer_time_end = 0.0
     sign_cooldown_end = 0.0
     cmd_reset_time_end = float('inf')
-    intersection_sign_count = 0
     intersection_signs = ["left", "right", "straight", "red", "green"]
+    
+    ZONE_OUTER = 0
+    ZONE_INNER = 1
+    ZONE_EXIT = 2
+    ZONE_RECOVERY = 3
+    current_zone = ZONE_OUTER
+    sign_locked = False
+    recovery_time_end = 0.0
     
     has_stop_triggered = False
     has_limit_triggered = False
@@ -196,15 +206,23 @@ def main():
                (sign_class in ["finish", "final"] and has_final_triggered):
                 sign_class = "없음"
 
-            if sign_class != "없음":
-                if current_time > sign_cooldown_end:
-                    cooldown_time = 4.0 
+            # 다수결 필터(On/Off 사각파) 특성 기반 Falling Edge 감지
+            if sign_class == "없음":
+                if sign_locked:
+                    sign_locked = False
+                    if current_zone == ZONE_EXIT:
+                        # 3단계 (ZONE_EXIT)에서 표지판이 사라진 순간(Falling Edge) 복귀 단계 진입
+                        current_zone = ZONE_RECOVERY
+                        recovery_time_end = current_time + 3.0
+                        print(f"\n[FSM] ZONE_EXIT -> ZONE_RECOVERY: 표지판 사라짐 감지 (3초 뒤 외곽 복귀 예약)")
 
+            if sign_class != "없음":
+                if not sign_locked:
+                    sign_locked = True  # Rising Edge 진입으로 인한 잠금(Lock) 활성화
+                    
                     if sign_class in intersection_signs:
-                        if current_command == 0 and sign_class == "straight":
-                            cooldown_time = 0
-                        else:
-                            intersection_sign_count += 1
+                        if current_zone == ZONE_OUTER:
+                            # 1단계 (ZONE_OUTER): 교차로 진입 대기 및 지령 설정
                             if sign_class == "left":
                                 current_command = 1
                             elif sign_class == "right":
@@ -215,38 +233,69 @@ def main():
                                 current_command = 1                  
                                 stop_time_end = current_time + 3.0   
                             elif sign_class == "green":
-                                current_command = 2                  
+                                current_command = 2
+                            
+                            current_zone = ZONE_INNER
+                            print(f"\n[FSM] ZONE_OUTER -> ZONE_INNER: {sign_class} 감지 (cmd: {current_command})")
 
-                            if intersection_sign_count == 1:
-                                cooldown_time = 4.0
-                                cmd_reset_time_end = float('inf')
-                            elif intersection_sign_count == 2:
-                                cooldown_time = 7.0
-                                cmd_reset_time_end = float('inf')
-                            elif intersection_sign_count >= 3:
-                                cooldown_time = 4.0
-                                cmd_reset_time_end = current_time + 4.0
+                        elif current_zone == ZONE_INNER:
+                            # 2단계 (ZONE_INNER): 교차로 내부 주행 중 내부 액션 지령 수신
+                            if sign_class == "left":
+                                current_command = 1
+                            elif sign_class == "right":
+                                current_command = 2
+                            elif sign_class == "straight":
+                                current_command = 3
+                            elif sign_class == "red":
+                                current_command = 1                  
+                                stop_time_end = current_time + 3.0   
+                            elif sign_class == "green":
+                                current_command = 2
+                            
+                            current_zone = ZONE_EXIT
+                            print(f"\n[FSM] ZONE_INNER -> ZONE_EXIT: {sign_class} 감지 (cmd: {current_command})")
+
+                        elif current_zone == ZONE_EXIT:
+                            # 3단계 (ZONE_EXIT): 탈출 명령 표지판이 들어왔을 때 최종 탈출 명령 주입 (Rising Edge)
+                            if sign_class == "left":
+                                current_command = 1
+                            elif sign_class == "right":
+                                current_command = 2
+                            elif sign_class == "straight":
+                                current_command = 3
+                            elif sign_class == "red":
+                                current_command = 1                  
+                                stop_time_end = current_time + 3.0   
+                            elif sign_class == "green":
+                                current_command = 2
+                            print(f"\n[FSM] ZONE_EXIT: {sign_class} 감지 (탈출 cmd: {current_command} 적용)")
 
                     elif sign_class == "stop":
                         stop_time_end = current_time + 3.5 
-                        cooldown_time = 5.0
                         has_stop_triggered = True
+                        print(f"\n[SIGN] stop 감지 (3.5초 대기)")
                     elif sign_class == "limit":
                         limit_time_end = current_time + 4.0 
                         has_limit_triggered = True
+                        print(f"\n[SIGN] limit 감지 (4초 서행)")
                     elif sign_class == "brr":
                         buzzer_time_end = current_time + 1.0 
                         has_brr_triggered = True
+                        print(f"\n[SIGN] brr 감지 (1초 버저)")
                     elif sign_class in ["finish", "final"]: 
                         final_time_end = current_time + 4.0
                         has_final_triggered = True
-                        cooldown_time = 5.0
+                        print(f"\n[SIGN] finish/final 감지 (4초 뒤 종료)")
 
-                    sign_cooldown_end = current_time + cooldown_time
+            # 복귀 단계 (ZONE_RECOVERY) 처리: 타이머 만료 시 외곽으로 복귀
+            if current_zone == ZONE_RECOVERY:
+                if current_time > recovery_time_end:
+                    current_command = 0
+                    current_zone = ZONE_OUTER
+                    print(f"\n[FSM] ZONE_RECOVERY -> ZONE_OUTER: 외곽 차선 복귀 완료 (cmd: 0)")
 
             if current_command in [1, 2, 3] and current_time > cmd_reset_time_end:
                 current_command = 0  
-                intersection_sign_count = 0
                 cmd_reset_time_end = float('inf') 
                 
             if current_time > final_time_end:
@@ -259,7 +308,8 @@ def main():
             if current_time < stop_time_end:
                 set_motors(0, 0)
                 if (current_time - last_print_time) > 0.3:
-                    sys.stdout.write(f"\r[대기] 표지판:{latest_sign_text} | 카운트:{intersection_sign_count}/3 | 남은시간:{stop_time_end - current_time:.1f}s\033[K")
+                    zone_str = ["외곽", "내부선회", "탈출대기", "복귀주행"][current_zone]
+                    sys.stdout.write(f"\r[대기] 표지판:{latest_sign_text} | 구역:{zone_str} | 남은시간:{stop_time_end - current_time:.1f}s\033[K")
                     sys.stdout.flush()
                     last_print_time = current_time
                 continue
@@ -327,13 +377,13 @@ def main():
                 dir_str = "좌조향"
 
             if (current_time - last_print_time) > 0.3:
-                cmd_str = ["외곽", "좌회전", "우회전", "교차로직진"][current_command]
-                reset_str = f"리셋예약({cmd_reset_time_end - current_time:.1f}s)" if cmd_reset_time_end != float('inf') else "일반차선"
+                zone_str = ["외곽", "내부선회", "탈출대기", "복귀주행"][current_zone]
+                yolo_latency_ms = shared_data.get('yolo_latency_ms', 0.0)
                 sys.stdout.write(
-                    f"\r[{speed_str}] CIL:{cmd_str} | 조향:{dir_str} | "
-                    f"raw:{raw_prediction:.3f} | ema:{smoothed_prediction:.3f} | kp:{raw_P:.3f} | final:{P:.3f} | "
-                    f"latency:{inference_ms:.1f}ms | "
-                    f"표지판:{latest_sign_text} | 카운트:{intersection_sign_count}/3 | {reset_str}\033[K"
+                    f"\rC[{current_command}] | raw:{raw_prediction:.3f} | "
+                    f"P:{P:.3f} | "
+                    f"구역:{zone_str} | 표지판:{sign_class} | "
+                    f"L : {inference_ms:.1f}ms , Y : {yolo_latency_ms:.1f}ms\033[K"
                 )
                 sys.stdout.flush()
                 last_print_time = current_time
