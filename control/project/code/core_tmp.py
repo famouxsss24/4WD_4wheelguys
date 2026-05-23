@@ -235,7 +235,7 @@ def main():
                             elif sign_class == "straight":
                                 current_command = 3
                             elif sign_class == "red":
-                                current_command = 1                  
+                                current_command = 2                  
                                 stop_time_end = current_time + 3.0   
                             elif sign_class == "green":
                                 current_command = 2
@@ -252,7 +252,7 @@ def main():
                             elif sign_class == "straight":
                                 current_command = 3
                             elif sign_class == "red":
-                                current_command = 1                  
+                                current_command = 2                  
                                 stop_time_end = current_time + 3.0   
                             elif sign_class == "green":
                                 current_command = 2
