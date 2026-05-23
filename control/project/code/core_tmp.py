@@ -169,6 +169,8 @@ def main():
     has_limit_triggered = False
     has_brr_triggered = False
     has_final_triggered = False
+    has_red_triggered = False
+    has_green_triggered = False
     final_time_end = float('inf')
     last_inference_time = time.time()
     inference_ms = 0.0
@@ -204,7 +206,9 @@ def main():
             if (sign_class == "stop" and has_stop_triggered) or \
                (sign_class == "limit" and has_limit_triggered) or \
                (sign_class == "brr" and has_brr_triggered) or \
-               (sign_class in ["finish", "final"] and has_final_triggered):
+               (sign_class in ["finish", "final"] and has_final_triggered) or \
+               (sign_class == "red" and has_red_triggered) or \
+               (sign_class == "green" and has_green_triggered):
                 sign_class = "없음"
 
             # 다수결 필터(On/Off 사각파) 특성 기반 Falling Edge 감지
@@ -237,8 +241,10 @@ def main():
                             elif sign_class == "red":
                                 current_command = 2                  
                                 stop_time_end = current_time + 3.0   
+                                has_red_triggered = True
                             elif sign_class == "green":
                                 current_command = 2
+                                has_green_triggered = True
                             
                             current_zone = ZONE_INNER
                             print(f"\n[FSM] ZONE_OUTER -> ZONE_INNER: {sign_class} 감지 (cmd: {current_command})")
@@ -254,8 +260,10 @@ def main():
                             elif sign_class == "red":
                                 current_command = 2                  
                                 stop_time_end = current_time + 3.0   
+                                has_red_triggered = True
                             elif sign_class == "green":
                                 current_command = 2
+                                has_green_triggered = True
                             
                             current_zone = ZONE_EXIT
                             print(f"\n[FSM] ZONE_INNER -> ZONE_EXIT: {sign_class} 감지 (cmd: {current_command})")
@@ -271,8 +279,10 @@ def main():
                             elif sign_class == "red":
                                 current_command = 2                  
                                 stop_time_end = current_time + 3.0   
+                                has_red_triggered = True
                             elif sign_class == "green":
                                 current_command = 2
+                                has_green_triggered = True
                             print(f"\n[FSM] ZONE_EXIT: {sign_class} 감지 (탈출 cmd: {current_command} 적용)")
 
                     elif sign_class == "stop":
