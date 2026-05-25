@@ -264,58 +264,53 @@ def main():
             # Rising Edge 감지 (유예 시간 경과 시 활성화)
             if sign_class != "없음":
                 if not sign_locked and (current_time > sign_cooldown_end):
-                    sign_locked = True  # Rising Edge 진입으로 인한 잠금(Lock) 활성화
-                    zone_transition_time = current_time  # 데바운스 기준 시간 갱신
-                    
+                    # 구역별 표지판 타당성(Gating) 검사
+                    is_valid_sign = True
                     if sign_class in intersection_signs:
-                        if current_zone == ZONE_OUTER:
-                            # 1단계 (ZONE_OUTER): 교차로 진입 대기 및 지령 설정
-                            if sign_class == "left":
-                                current_command = 1
-                            elif sign_class == "right":
-                                current_command = 2
-                            elif sign_class == "straight":
-                                current_command = 3
-                            elif sign_class == "red":
-                                current_command = 1                  
-                                stop_time_end = current_time + 3.0   
-                            elif sign_class == "green":
-                                current_command = 2
-                            
-                            current_zone = ZONE_INNER
-                            print(f"\n[FSM] ZONE_OUTER -> ZONE_INNER: {sign_class} 감지 (cmd: {current_command})")
+                        if current_zone == ZONE_OUTER and sign_class not in ["left", "right"]:
+                            is_valid_sign = False
+                        elif current_zone == ZONE_EXIT and sign_class not in ["left", "right"]:
+                            is_valid_sign = False
 
-                        elif current_zone == ZONE_INNER:
-                            # 2단계 (ZONE_INNER): 교차로 내부 주행 중 내부 액션 지령 수신
-                            if sign_class == "left":
-                                current_command = 1
-                            elif sign_class == "right":
-                                current_command = 2
-                            elif sign_class == "straight":
-                                current_command = 3
-                            elif sign_class == "red":
-                                current_command = 1                  
-                                stop_time_end = current_time + 3.0   
-                            elif sign_class == "green":
-                                current_command = 2
-                            
-                            current_zone = ZONE_EXIT
-                            print(f"\n[FSM] ZONE_INNER -> ZONE_EXIT: {sign_class} 감지 (cmd: {current_command})")
+                    if is_valid_sign:
+                        sign_locked = True  # Rising Edge 진입으로 인한 잠금(Lock) 활성화
+                        zone_transition_time = current_time  # 데바운스 기준 시간 갱신
+                        
+                        if sign_class in intersection_signs:
+                            if current_zone == ZONE_OUTER:
+                                # 1단계 (ZONE_OUTER): 교차로 진입 대기 및 지령 설정
+                                if sign_class == "left":
+                                    current_command = 1
+                                elif sign_class == "right":
+                                    current_command = 2
+                                
+                                current_zone = ZONE_INNER
+                                print(f"\n[FSM] ZONE_OUTER -> ZONE_INNER: {sign_class} 감지 (cmd: {current_command})")
 
-                        elif current_zone == ZONE_EXIT:
-                            # 3단계 (ZONE_EXIT): 탈출 명령 표지판이 들어왔을 때 최종 탈출 명령 주입 (Rising Edge)
-                            if sign_class == "left":
-                                current_command = 1
-                            elif sign_class == "right":
-                                current_command = 2
-                            elif sign_class == "straight":
-                                current_command = 3
-                            elif sign_class == "red":
-                                current_command = 2                  
-                                stop_time_end = current_time + 3.0   
-                            elif sign_class == "green":
-                                current_command = 2
-                            print(f"\n[FSM] ZONE_EXIT: {sign_class} 감지 (탈출 cmd: {current_command} 적용)")
+                            elif current_zone == ZONE_INNER:
+                                # 2단계 (ZONE_INNER): 교차로 내부 주행 중 내부 액션 지령 수신
+                                if sign_class == "left":
+                                    current_command = 1
+                                elif sign_class == "right":
+                                    current_command = 2
+                                elif sign_class == "straight":
+                                    current_command = 3
+                                elif sign_class == "red":
+                                    current_command = 2                  
+                                    stop_time_end = current_time + 3.0   
+                                elif sign_class == "green":
+                                    current_command = 2
+                                
+                                current_zone = ZONE_EXIT
+                                print(f"\n[FSM] ZONE_INNER -> ZONE_EXIT: {sign_class} 감지 (cmd: {current_command})")
+
+                            elif current_zone == ZONE_EXIT:
+                                # 3단계 (ZONE_EXIT): 탈출 명령 표지판이 들어왔을 때 최종 탈출 명령 주입 (Rising Edge)
+                                if sign_class == "left":
+                                    current_command = 1
+                                elif sign_class == "right":
+                                    current_command = 2
+                                print(f"\n[FSM] ZONE_EXIT: {sign_class} 감지 (탈출 cmd: {current_command} 적용)")
 
                     elif sign_class == "stop":
                         stop_time_end = current_time + 3.5 
