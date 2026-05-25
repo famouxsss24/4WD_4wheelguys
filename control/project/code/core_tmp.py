@@ -7,7 +7,7 @@ import sys
 import collections
 from ultralytics import YOLO
 import mycamera
-from gpiozero import PWMOutputDevice, DigitalOutputDevice, Buzzer
+from gpiozero import PWMOutputDevice, DigitalOutputDevice, TonalBuzzer
 
 PWMA = PWMOutputDevice(18)
 AIN1 = DigitalOutputDevice(22)
@@ -17,7 +17,10 @@ PWMB = PWMOutputDevice(23)
 BIN1 = DigitalOutputDevice(25)  
 BIN2 = DigitalOutputDevice(24)
 
-BUZZER = Buzzer(12) 
+BUZZER = TonalBuzzer(12) 
+
+SIGN_MODEL_PATH = "model/best_320_int8.tflite"
+LANE_MODEL_PATH = "model/model_quant_0523.tflite"
 
 def set_motors(left_speed, right_speed):
     left_dir = "backward" if left_speed < 0 else "forward"
@@ -31,7 +34,10 @@ def set_motors(left_speed, right_speed):
 
 def stop():
     PWMA.value, PWMB.value = 0, 0
-    BUZZER.off()
+    try:
+        BUZZER.stop()
+    except Exception:
+        pass
 
 def sign_detection_process(frame_queue, shared_data, running_event):
     import os
@@ -44,7 +50,7 @@ def sign_detection_process(frame_queue, shared_data, running_event):
     except Exception:
         pass
 
-    model_path = "model/best_320_int8.tflite" 
+    model_path = SIGN_MODEL_PATH 
     try:
         interpreter = tflite.Interpreter(model_path=model_path, num_threads=2)
         interpreter.allocate_tensors()
@@ -115,7 +121,7 @@ def sign_detection_process(frame_queue, shared_data, running_event):
                 valid_samples = [x for x in histories[cls] if x is not None]
                 if len(valid_samples) >= n_threshold:
                     latest_area, latest_conf = valid_samples[-1]
-                    if latest_area >= 0.03:
+                    if latest_area >= 0.04:
                         valid_candidates.append((cls, latest_area, latest_conf))
             
             if len(valid_candidates) > 0:
@@ -147,7 +153,7 @@ def main():
     except Exception:
         pass
 
-    lane_model_path = "model/model_quant_0523.tflite"
+    lane_model_path = LANE_MODEL_PATH
     interpreter = tflite.Interpreter(model_path=lane_model_path, num_threads=2)
     interpreter.allocate_tensors()
     input_details = interpreter.get_input_details()
@@ -317,6 +323,10 @@ def main():
                         elif sign_class == "brr":
                             buzzer_time_end = current_time + 1.0 
                             has_brr_triggered = True
+                            try:
+                                BUZZER.play(391)
+                            except Exception:
+                                pass
                             print(f"\n[SIGN] brr 감지 (1초 버저)")
                         elif sign_class in ["finish", "final"]: 
                             final_time_end = current_time + 4.0
@@ -348,16 +358,18 @@ def main():
                 continue
 
             if current_time < limit_time_end:
-                speedSet = 0.3
-                speed_str = "서행(0.3)"
+                speedSet = 0.2
+                speed_str = "서행"
             else:
                 speedSet = 0.5
-                speed_str = "정상(0.4)"
+                speed_str = "정상"
 
-            if current_time < buzzer_time_end:
-                BUZZER.on()
-            else:
-                BUZZER.off()
+            if buzzer_time_end > 0.0 and current_time >= buzzer_time_end:
+                try:
+                    BUZZER.stop()
+                except Exception:
+                    pass
+                buzzer_time_end = 0.0
 
             image_rgb = frame[:, :, ::-1]
             height = image_rgb.shape[0]
