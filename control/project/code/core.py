@@ -312,26 +312,26 @@ def main():
                                     current_command = 2
                                 print(f"\n[FSM] ZONE_EXIT: {sign_class} 감지 (탈출 cmd: {current_command} 적용)")
 
-                    elif sign_class == "stop":
-                        stop_time_end = current_time + 3.5 
-                        has_stop_triggered = True
-                        print(f"\n[SIGN] stop 감지 (3.5초 대기)")
-                    elif sign_class == "limit":
-                        limit_time_end = current_time + 4.0 
-                        has_limit_triggered = True
-                        print(f"\n[SIGN] limit 감지 (4초 서행)")
-                    elif sign_class == "brr":
-                        buzzer_time_end = current_time + 1.0 
-                        has_brr_triggered = True
-                        try:
-                            BUZZER.play(391)
-                        except Exception:
-                            pass
-                        print(f"\n[SIGN] brr 감지 (1초 버저)")
-                    elif sign_class in ["finish", "final"]: 
-                        final_time_end = current_time + 4.0
-                        has_final_triggered = True
-                        print(f"\n[SIGN] finish/final 감지 (4초 뒤 종료)")
+                        elif sign_class == "stop":
+                            stop_time_end = current_time + 3.5 
+                            has_stop_triggered = True
+                            print(f"\n[SIGN] stop 감지 (3.5초 대기)")
+                        elif sign_class == "limit":
+                            limit_time_end = current_time + 4.0 
+                            has_limit_triggered = True
+                            print(f"\n[SIGN] limit 감지 (4초 서행)")
+                        elif sign_class == "brr":
+                            buzzer_time_end = current_time + 1.0 
+                            has_brr_triggered = True
+                            try:
+                                BUZZER.play(391)
+                            except Exception:
+                                pass
+                            print(f"\n[SIGN] brr 감지 (1초 버저)")
+                        elif sign_class in ["finish", "final"]: 
+                            final_time_end = current_time + 4.0
+                            has_final_triggered = True
+                            print(f"\n[SIGN] finish/final 감지 (4초 뒤 종료)")
 
             # 복귀 단계 (ZONE_RECOVERY) 처리: 타이머 만료 시 외곽으로 복귀
             if current_zone == ZONE_RECOVERY:
