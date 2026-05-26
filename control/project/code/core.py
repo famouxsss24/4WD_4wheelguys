@@ -96,7 +96,7 @@ def sign_detection_process(frame_queue, shared_data, running_event):
             
             current_frame_detections = {}
             
-            mask = scores >= 0.5
+            mask = scores >= 0.65
             filtered_boxes = boxes[mask]
             filtered_scores = scores[mask]
             filtered_class_ids = class_ids[mask]
@@ -121,7 +121,7 @@ def sign_detection_process(frame_queue, shared_data, running_event):
                 valid_samples = [x for x in histories[cls] if x is not None]
                 if len(valid_samples) >= n_threshold:
                     latest_area, latest_conf = valid_samples[-1]
-                    if latest_area >= 0.04:
+                    if latest_area >= 0.03:
                         valid_candidates.append((cls, latest_area, latest_conf))
             
             if len(valid_candidates) > 0:
@@ -264,19 +264,18 @@ def main():
             # Rising Edge 감지 (유예 시간 경과 시 활성화)
             if sign_class != "없음":
                 if not sign_locked and (current_time > sign_cooldown_end):
-                    # 구역별 표지판 타당성(Gating) 검사
-                    is_valid_sign = True
                     if sign_class in intersection_signs:
+                        # 구역별 표지판 타당성(Gating) 검사
+                        is_valid_sign = True
                         if current_zone == ZONE_OUTER and sign_class not in ["left", "right"]:
                             is_valid_sign = False
                         elif current_zone == ZONE_EXIT and sign_class not in ["left", "right"]:
                             is_valid_sign = False
 
-                    if is_valid_sign:
-                        sign_locked = True  # Rising Edge 진입으로 인한 잠금(Lock) 활성화
-                        zone_transition_time = current_time  # 데바운스 기준 시간 갱신
-                        
-                        if sign_class in intersection_signs:
+                        if is_valid_sign:
+                            sign_locked = True  # Rising Edge 진입으로 인한 잠금(Lock) 활성화
+                            zone_transition_time = current_time  # 데바운스 기준 시간 갱신
+                            
                             if current_zone == ZONE_OUTER:
                                 # 1단계 (ZONE_OUTER): 교차로 진입 대기 및 지령 설정
                                 if sign_class == "left":
@@ -311,8 +310,12 @@ def main():
                                 elif sign_class == "right":
                                     current_command = 2
                                 print(f"\n[FSM] ZONE_EXIT: {sign_class} 감지 (탈출 cmd: {current_command} 적용)")
-
-                        elif sign_class == "stop":
+                    else:
+                        # 일반 액션 표지판 (stop, limit, brr, finish/final)
+                        sign_locked = True
+                        zone_transition_time = current_time
+                        
+                        if sign_class == "stop":
                             stop_time_end = current_time + 3.5 
                             has_stop_triggered = True
                             print(f"\n[SIGN] stop 감지 (3.5초 대기)")
