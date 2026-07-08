@@ -10,7 +10,9 @@
 
 라즈베리파이 기반 자율주행 RC카의 트랙 주행 데모입니다. 아래 영상을 클릭하면 재생됩니다.
 
-<video src="https://github.com/famouxsss24/4WD_4wheelguys/raw/main/media/demo.mp4" controls></video>
+
+
+
 
 ## 📸 프로젝트 갤러리
 
