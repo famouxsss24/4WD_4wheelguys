@@ -1,6 +1,18 @@
 # 4WD_4wheelguys
-
 광운대학교 임베디드인공지능시스템 최적화 Project, "사륜구동" 팀입니다.
+
+## 🔧 프로젝트 요약
+표지판·신호등 인식 기반 자율주행 RC카를 5인 팀으로 개발했습니다.
+
+- **인식 모델**: YOLOv11n 기반 표지판/신호등 인식
+- **엣지 최적화**: ONNX→TFLite INT8 양자화로 라즈베리파이5 실시간 구동 확보 (75%↓, mAP 0.95, 30FPS)
+- **주행 제어**: Conditional Imitation Learning 기반 조향 모델과 인식 결과 결합
+
+## 🏆 성과
+포스터·실무보고서 부문 우수상 (매치업 심화과정 시상식)
+
+## 🎬 데모 영상
+...(기존 내용 이어짐)
 
 <img width="3401" height="4535" alt="임베디드인공지능시스템최적화_포스터 (900 x 1200 mm) (900 x 1200 mm) pdf" src="https://github.com/user-attachments/assets/a366bda5-b642-41fe-815c-f9be63182590" />
 
