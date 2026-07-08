@@ -11,6 +11,7 @@
 라즈베리파이 기반 자율주행 RC카의 트랙 주행 데모입니다. 아래 영상을 클릭하면 재생됩니다.
 
 
+https://github.com/user-attachments/assets/5201b997-aafb-4de9-93ed-3cc123f96539
 
 
 
