@@ -9,7 +9,7 @@
 - **주행 제어**: Conditional Imitation Learning 기반 조향 모델과 인식 결과 결합
 
 ## 🏆 성과
-포스터·실무보고서 부문 우수상 (매치업 심화과정 시상식)
+포스터·실무보고서 부문 우수상 (광운대학교 매치업 심화과정 시상식)
 
 <img width="3401" height="4535" alt="임베디드인공지능시스템최적화_포스터 (900 x 1200 mm) (900 x 1200 mm) pdf" src="https://github.com/user-attachments/assets/a366bda5-b642-41fe-815c-f9be63182590" />
 
