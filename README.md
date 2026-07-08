@@ -11,9 +11,6 @@
 ## 🏆 성과
 포스터·실무보고서 부문 우수상 (매치업 심화과정 시상식)
 
-## 🎬 데모 영상
-...(기존 내용 이어짐)
-
 <img width="3401" height="4535" alt="임베디드인공지능시스템최적화_포스터 (900 x 1200 mm) (900 x 1200 mm) pdf" src="https://github.com/user-attachments/assets/a366bda5-b642-41fe-815c-f9be63182590" />
 
 <br>
@@ -25,7 +22,6 @@
 
 
 https://github.com/user-attachments/assets/5201b997-aafb-4de9-93ed-3cc123f96539
-
 
 
 ## 📸 프로젝트 갤러리
